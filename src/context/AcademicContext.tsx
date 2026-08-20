@@ -203,16 +203,21 @@ export const AcademicProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   });
 
   const finishAuthentication = (user: AuthUser) => {
+    const isSuperAdmin = user.email.trim().toLowerCase() === 'myselfsupratik@gmail.com';
+    const assignedRole = isSuperAdmin ? 'admin' : user.role;
     setProfile(prev => ({
       ...prev,
       name: user.name || prev.name,
       email: user.email,
       outlookEmail: user.email,
-      role: user.role,
+      role: assignedRole,
       isOutlookConnected: true,
       isOneDriveSynced: true,
     }));
     setIsAuthenticated(true);
+    if (assignedRole === 'admin' || assignedRole === 'sub_admin') {
+      setIsAdminMode(true);
+    }
     setAuthLoading(false);
   };
 

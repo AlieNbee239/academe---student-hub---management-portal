@@ -1,17 +1,20 @@
 import React from 'react';
 import { 
+  Calendar as CalendarIcon, 
+  Clock, 
   Video, 
+  ChevronRight, 
+  ChevronLeft, 
   FileText, 
   CheckSquare, 
-  Play, 
-  Megaphone, 
-  ChevronLeft,
-  ChevronRight,
-  CheckCircle2,
-  X
+  X, 
+  CheckCircle2, 
+  Play,
+  AlertCircle
 } from 'lucide-react';
 import { useAcademic } from '../context/AcademicContext';
 import { ClassSession } from '../types';
+import { getYesterdayDateString, getTodayDateString } from '../utils/date';
 
 interface RightBriefContentProps {
   onCloseMobile?: () => void;
@@ -24,15 +27,17 @@ const RightBriefContent: React.FC<RightBriefContentProps> = ({ onCloseMobile }) 
     filteredClassSessions, 
     filteredAssignments, 
     filteredQuizzes, 
-    filteredRecordings, 
-    announcements,
     setActiveMeetingModal,
-    setActiveRecordingModal,
     setActiveAssignmentModal,
     setActiveQuizModal,
     toggleAssignmentCompleted,
     setCurrentView
   } = useAcademic();
+
+  const yesterdayStr = getYesterdayDateString();
+  const todayStr = getTodayDateString();
+  const isYesterday = selectedDate === yesterdayStr;
+  const isToday = selectedDate === todayStr;
 
   // Format date details
   const [year, month, day] = selectedDate.split('-').map(Number);
@@ -41,12 +46,18 @@ const RightBriefContent: React.FC<RightBriefContentProps> = ({ onCloseMobile }) 
   const monthName = dateObj.toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' });
   const weekdayName = dateObj.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
 
-  // Filter items for selected day
+  // Filter classes for selected day
   const dayClasses = filteredClassSessions.filter(s => s.date === selectedDate);
-  const dayAssignments = filteredAssignments.filter(a => a.dueDate === selectedDate);
-  const dayQuizzes = filteredQuizzes.filter(q => q.date === selectedDate);
-  const dayRecordings = filteredRecordings.filter(r => r.date === selectedDate);
-  const dayAnnouncements = announcements.filter(a => a.date === selectedDate);
+
+  // Active / Running Assignments (all upcoming or pending assignments)
+  const runningAssignments = filteredAssignments
+    .filter(a => !a.isCompleted || a.dueDate >= todayStr)
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.dueTime.localeCompare(b.dueTime));
+
+  // Active / Running Quizzes (all upcoming or active quizzes)
+  const runningQuizzes = filteredQuizzes
+    .filter(q => q.date >= todayStr || q.status === 'live' || q.status === 'upcoming')
+    .sort((a, b) => a.date.localeCompare(b.date) || a.dueTime.localeCompare(b.dueTime));
 
   const handleJoinClick = (session: ClassSession) => {
     setActiveMeetingModal(session);
@@ -61,8 +72,18 @@ const RightBriefContent: React.FC<RightBriefContentProps> = ({ onCloseMobile }) 
           <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
             {dayNumber} {monthName}
           </h2>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
-            {weekdayName}
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mt-0.5 flex items-center gap-1.5">
+            <span>{weekdayName}</span>
+            {isYesterday && (
+              <span className="text-red-600 font-extrabold bg-red-50 border border-red-200 px-1.5 py-0.5 rounded text-[10px]">
+                Yesterday
+              </span>
+            )}
+            {isToday && (
+              <span className="text-blue-600 font-extrabold bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded text-[10px]">
+                Today
+              </span>
+            )}
           </p>
         </div>
 
@@ -121,7 +142,7 @@ const RightBriefContent: React.FC<RightBriefContentProps> = ({ onCloseMobile }) 
               {dayClasses.map((session) => (
                 <div 
                   key={session.id}
-                  className="flex items-start justify-between gap-3 group text-left"
+                  className="flex items-start justify-between gap-3 group text-left p-2.5 rounded-2xl bg-slate-50/60 border border-slate-100 hover:border-slate-200 transition-all"
                 >
                   <div className="flex items-start gap-2.5 min-w-0">
                     <div className="w-2 h-2 rounded-full bg-blue-600 mt-1.5 shrink-0" />
@@ -133,44 +154,35 @@ const RightBriefContent: React.FC<RightBriefContentProps> = ({ onCloseMobile }) 
                         {session.courseName}
                       </h4>
                       <p className="text-[11px] text-slate-500 truncate">
-                        {session.lectureNumber} • {session.professor} {session.recurringSlot && `• (${session.recurringSlot})`}
+                        {session.lectureNumber} • {session.professor}
                       </p>
                     </div>
                   </div>
 
-                  {session.status === 'completed' && session.hasRecording ? (
-                    <button
-                      onClick={() => {
-                        const rec = filteredRecordings.find(r => r.courseId === session.courseId) || filteredRecordings[0];
-                        if (rec) window.open(rec.oneDriveUrl, '_blank', 'noopener,noreferrer');
-                        if (onCloseMobile) onCloseMobile();
-                      }}
-                      className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center gap-1 shrink-0 border border-emerald-200 transition-colors"
-                    >
-                      <Play className="w-3 h-3 fill-emerald-600" />
-                      Recording
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleJoinClick(session)}
-                      className="px-3 py-1 rounded-lg bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white text-xs font-bold flex items-center gap-1.5 shrink-0 border border-blue-200 hover:border-blue-600 transition-all shadow-2xs"
-                    >
-                      <Video className="w-3.5 h-3.5" />
-                      Join
-                    </button>
-                  )}
+                  <button
+                    onClick={() => handleJoinClick(session)}
+                    className="px-3 py-1 rounded-lg bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white text-xs font-bold flex items-center gap-1.5 shrink-0 border border-blue-200 hover:border-blue-600 transition-all shadow-2xs"
+                  >
+                    <Video className="w-3.5 h-3.5" />
+                    Join
+                  </button>
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* ASSIGNMENTS */}
+        {/* RUNNING ASSIGNMENTS */}
         <div className="pt-2 border-t border-slate-100">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] font-extrabold tracking-wider text-slate-400 uppercase">
-              Assignments
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-extrabold tracking-wider text-slate-400 uppercase">
+                Active Assignments
+              </span>
+              <span className="text-[10px] font-bold bg-red-50 text-red-700 px-1.5 py-0.2 rounded-full border border-red-100">
+                {runningAssignments.length}
+              </span>
+            </div>
             <button 
               onClick={() => {
                 setCurrentView('assignments');
@@ -178,18 +190,18 @@ const RightBriefContent: React.FC<RightBriefContentProps> = ({ onCloseMobile }) 
               }}
               className="text-[11px] text-blue-600 hover:underline font-semibold"
             >
-              All
+              View All
             </button>
           </div>
 
-          {dayAssignments.length === 0 ? (
-            <p className="text-xs text-slate-400 italic">No assignments due on this date</p>
+          {runningAssignments.length === 0 ? (
+            <p className="text-xs text-slate-400 italic">No active assignments running</p>
           ) : (
-            <div className="space-y-2">
-              {dayAssignments.map((assign) => (
+            <div className="space-y-2.5">
+              {runningAssignments.slice(0, 5).map((assign) => (
                 <div
                   key={assign.id}
-                  className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/70 border border-slate-100 hover:border-slate-200 transition-all"
+                  className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50/80 border border-slate-100 hover:border-slate-200 transition-all"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <button
@@ -199,7 +211,7 @@ const RightBriefContent: React.FC<RightBriefContentProps> = ({ onCloseMobile }) 
                           ? 'bg-emerald-50 text-emerald-600' 
                           : 'bg-red-50 text-red-600 hover:bg-red-100'
                       }`}
-                      title="Toggle done"
+                      title="Toggle complete"
                     >
                       {assign.isCompleted ? <CheckCircle2 className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
                     </button>
@@ -207,8 +219,9 @@ const RightBriefContent: React.FC<RightBriefContentProps> = ({ onCloseMobile }) 
                       <h4 className={`text-xs font-bold truncate ${assign.isCompleted ? 'line-through text-slate-400' : 'text-slate-900'}`}>
                         {assign.title}
                       </h4>
-                      <p className="text-[10px] text-slate-500 truncate">
-                        Due today • {assign.dueTime} {assign.selfScore !== undefined && `• Score: ${assign.selfScore}/${assign.totalPoints}`}
+                      <p className="text-[10px] text-red-600 font-bold truncate mt-0.5 flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-red-500" />
+                        <span>Due: {assign.dueDate === todayStr ? 'Today' : assign.dueDate} • {assign.dueTime}</span>
                       </p>
                     </div>
                   </div>
@@ -218,9 +231,9 @@ const RightBriefContent: React.FC<RightBriefContentProps> = ({ onCloseMobile }) 
                       setActiveAssignmentModal(assign);
                       if (onCloseMobile) onCloseMobile();
                     }}
-                    className="px-2.5 py-1 rounded-md bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:text-blue-600 hover:border-blue-300 shadow-2xs transition-all shrink-0 ml-2"
+                    className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:text-blue-600 hover:border-blue-300 shadow-2xs transition-all shrink-0 ml-2"
                   >
-                    {assign.isCompleted ? (assign.selfScore !== undefined ? `${assign.selfScore} pts` : 'Done') : 'Open'}
+                    {assign.isCompleted ? 'Done' : 'Open'}
                   </button>
                 </div>
               ))}
@@ -228,12 +241,17 @@ const RightBriefContent: React.FC<RightBriefContentProps> = ({ onCloseMobile }) 
           )}
         </div>
 
-        {/* QUIZZES */}
+        {/* RUNNING QUIZZES */}
         <div className="pt-2 border-t border-slate-100">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] font-extrabold tracking-wider text-slate-400 uppercase">
-              Quizzes
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-extrabold tracking-wider text-slate-400 uppercase">
+                Active Quizzes
+              </span>
+              <span className="text-[10px] font-bold bg-orange-50 text-orange-700 px-1.5 py-0.2 rounded-full border border-orange-100">
+                {runningQuizzes.length}
+              </span>
+            </div>
             <button 
               onClick={() => {
                 setCurrentView('quizzes');
@@ -241,29 +259,30 @@ const RightBriefContent: React.FC<RightBriefContentProps> = ({ onCloseMobile }) 
               }}
               className="text-[11px] text-blue-600 hover:underline font-semibold"
             >
-              All
+              View All
             </button>
           </div>
 
-          {dayQuizzes.length === 0 ? (
-            <p className="text-xs text-slate-400 italic">No quizzes scheduled today</p>
+          {runningQuizzes.length === 0 ? (
+            <p className="text-xs text-slate-400 italic">No upcoming quizzes scheduled</p>
           ) : (
-            <div className="space-y-2">
-              {dayQuizzes.map((quiz) => (
+            <div className="space-y-2.5">
+              {runningQuizzes.slice(0, 5).map((quiz) => (
                 <div
                   key={quiz.id}
-                  className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/70 border border-slate-100 hover:border-slate-200 transition-all"
+                  className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50/80 border border-slate-100 hover:border-slate-200 transition-all"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-8 h-8 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
                       <CheckSquare className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
                       <h4 className="text-xs font-bold text-slate-900 truncate">
                         {quiz.title}
                       </h4>
-                      <p className="text-[10px] text-slate-500 truncate">
-                        Due today • {quiz.dueTime}
+                      <p className="text-[10px] text-orange-600 font-bold truncate mt-0.5 flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-orange-500" />
+                        <span>Date: {quiz.date === todayStr ? 'Today' : quiz.date} • {quiz.dueTime}</span>
                       </p>
                     </div>
                   </div>
@@ -273,98 +292,10 @@ const RightBriefContent: React.FC<RightBriefContentProps> = ({ onCloseMobile }) 
                       setActiveQuizModal(quiz);
                       if (onCloseMobile) onCloseMobile();
                     }}
-                    className="px-2.5 py-1 rounded-md bg-white border border-slate-200 text-xs font-semibold text-orange-600 hover:bg-orange-500 hover:text-white hover:border-orange-500 shadow-2xs transition-all shrink-0 ml-2"
+                    className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-orange-600 hover:bg-orange-500 hover:text-white hover:border-orange-500 shadow-2xs transition-all shrink-0 ml-2"
                   >
                     {quiz.status === 'completed' ? `Score: ${quiz.score}` : 'Open'}
                   </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* RECORDINGS */}
-        <div className="pt-2 border-t border-slate-100">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] font-extrabold tracking-wider text-slate-400 uppercase">
-              Recordings
-            </span>
-            <button 
-              onClick={() => {
-                setCurrentView('recordings');
-                if (onCloseMobile) onCloseMobile();
-              }}
-              className="text-[11px] text-blue-600 hover:underline font-semibold"
-            >
-              OneDrive Library
-            </button>
-          </div>
-
-          {dayRecordings.length === 0 ? (
-            <p className="text-xs text-slate-400 italic">No recordings published today</p>
-          ) : (
-            <div className="space-y-2">
-              {dayRecordings.map((rec) => (
-                <div
-                  key={rec.id}
-                  className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/70 border border-slate-100 hover:border-slate-200 transition-all"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                      <Video className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className="text-xs font-bold text-slate-900 truncate">
-                        {rec.lectureTitle}
-                      </h4>
-                      <p className="text-[10px] text-slate-500 truncate">
-                        {rec.duration} • Available
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      window.open(rec.oneDriveUrl, '_blank', 'noopener,noreferrer');
-                      if (onCloseMobile) onCloseMobile();
-                    }}
-                    className="px-2.5 py-1 rounded-md bg-white border border-slate-200 text-xs font-semibold text-emerald-700 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 shadow-2xs transition-all shrink-0 ml-2"
-                  >
-                    Watch
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* ANNOUNCEMENTS */}
-        <div className="pt-2 border-t border-slate-100">
-          <span className="text-[11px] font-extrabold tracking-wider text-slate-400 uppercase block mb-3">
-            Announcements
-          </span>
-
-          {dayAnnouncements.length === 0 ? (
-            <div className="flex items-center gap-2 py-2 text-xs text-slate-400">
-              <Megaphone className="w-4 h-4 text-purple-400 shrink-0" />
-              <span>No announcements for today</span>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {dayAnnouncements.map((ann) => (
-                <div 
-                  key={ann.id} 
-                  className={`p-3 rounded-xl border text-xs ${
-                    ann.priority === 'urgent' 
-                      ? 'bg-red-50/80 border-red-200 text-red-900' 
-                      : 'bg-purple-50/70 border-purple-200 text-purple-900'
-                  }`}
-                >
-                  <div className="font-bold mb-1 flex items-center justify-between">
-                    <span>{ann.title}</span>
-                    <span className="text-[10px] opacity-75">{ann.time}</span>
-                  </div>
-                  <p className="text-[11px] opacity-90">{ann.content}</p>
                 </div>
               ))}
             </div>

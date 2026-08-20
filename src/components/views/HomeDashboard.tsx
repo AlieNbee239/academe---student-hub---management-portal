@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { 
   Calendar as CalendarIcon, 
   Clock, 
@@ -20,6 +20,9 @@ import {
 } from 'lucide-react';
 import { useAcademic } from '../../context/AcademicContext';
 import { ClassSession } from '../../types';
+import { getTodayDateString, getYesterdayDateString, getTomorrowDateString } from '../../utils/date';
+
+type BadgeType = 'none' | 'countdown' | 'live' | 'upcoming' | 'yesterday' | 'nextday';
 
 export const HomeDashboard: React.FC = () => {
   const { 
@@ -30,7 +33,7 @@ export const HomeDashboard: React.FC = () => {
     announcements, 
     recentUpdates, 
     selectedDate, 
-    setSelectedDate,
+    setSelectedDate, 
     navigateDate,
     enrolledCourses,
     curriculumConfig,
@@ -45,40 +48,150 @@ export const HomeDashboard: React.FC = () => {
     showToast
   } = useAcademic();
 
-  const [calendarViewMode, setCalendarViewMode] = useState<'Month' | 'Week' | 'Agenda'>('Month');
+  const [calendarViewMode, setCalendarViewMode] = useState<'Month' | 'Week' | 'Agenda'>('Week');
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
-  const [isAcademicTrackDismissed, setIsAcademicTrackDismissed] = useState(false);
-
-  // Next active class from student's enrolled courses based on selectedDate or upcoming status
-  const nextClass = filteredClassSessions.find(s => s.date === selectedDate && s.status === 'upcoming')
-    || filteredClassSessions.find(s => s.status === 'upcoming') 
-    || filteredClassSessions.find(s => s.date === selectedDate)
-    || filteredClassSessions[0];
-
-  const [timeUntilNextClass, setTimeUntilNextClass] = useState('');
+  const [isAcademicTrackDismissed, setIsAcademicTrackDismissed] = useState(() => {
+    return localStorage.getItem('academe_electives_saved') === 'true';
+  });
+  const [nowMinuteTick, setNowMinuteTick] = useState(0);
 
   useEffect(() => {
-    const updateCountdown = () => {
-      if (!nextClass) {
-        setTimeUntilNextClass('');
-        return;
+    const interval = window.setInterval(() => {
+      setNowMinuteTick(t => t + 1);
+    }, 15000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const parseTimeToMinutes = (timeStr: string): number => {
+    if (!timeStr) return 0;
+    const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (!match) return 0;
+    let hours = parseInt(match[1], 10);
+    const minutes = parseInt(match[2], 10);
+    const period = match[3].toUpperCase();
+    if (period === 'PM' && hours !== 12) hours += 12;
+    if (period === 'AM' && hours === 12) hours = 0;
+    return hours * 60 + minutes;
+  };
+
+  const todayStr = getTodayDateString();
+  const yesterdayStr = getYesterdayDateString();
+  const tomorrowStr = getTomorrowDateString();
+
+  // Find all classes on the selected date sorted by start time
+  const dayClassesSorted = useMemo(() => {
+    return [...filteredClassSessions.filter(s => s.date === selectedDate)]
+      .sort((a, b) => parseTimeToMinutes(a.startTime) - parseTimeToMinutes(b.startTime));
+  }, [filteredClassSessions, selectedDate]);
+
+  // Dynamic calculation for featured main lecture
+  const { featuredClass, classBannerLabel, countdownBadgeInfo, isViewingYesterday } = useMemo(() => {
+    const nowDate = new Date();
+    const currentMinutes = nowDate.getHours() * 60 + nowDate.getMinutes();
+    const isSelectedToday = selectedDate === todayStr;
+    const isYesterday = selectedDate === yesterdayStr;
+
+    // 1. If viewing TODAY
+    if (isSelectedToday) {
+      if (dayClassesSorted.length > 0) {
+        const firstClass = dayClassesSorted[0];
+        const firstStart = parseTimeToMinutes(firstClass.startTime);
+        const firstEnd = parseTimeToMinutes(firstClass.endTime) || (firstStart + 90);
+
+        // If 1st class hasn't finished yet
+        if (currentMinutes <= firstEnd) {
+          let badge: { text: string; type: BadgeType } = { text: '', type: 'none' };
+          if (currentMinutes < firstStart) {
+            const diffMin = firstStart - currentMinutes;
+            const hours = Math.floor(diffMin / 60);
+            const mins = diffMin % 60;
+            const formatted = hours > 0 ? (mins > 0 ? `${hours}h ${mins}m` : `${hours}h`) : `${mins}m`;
+            badge = { text: `Starts in ${formatted}`, type: 'countdown' };
+          } else {
+            badge = { text: 'Live Now', type: 'live' };
+          }
+          return {
+            featuredClass: firstClass,
+            classBannerLabel: 'Today • 1st Lecture',
+            countdownBadgeInfo: badge,
+            isViewingYesterday: false,
+          };
+        } else {
+          // 1st lecture ended -> show 2nd lecture in main body (or next remaining active lecture of today)
+          const remainingToday = dayClassesSorted.filter(s => {
+            const endMin = parseTimeToMinutes(s.endTime) || (parseTimeToMinutes(s.startTime) + 90);
+            return currentMinutes <= endMin;
+          });
+
+          if (remainingToday.length > 0) {
+            const nextTodayClass = remainingToday[0];
+            const nextStart = parseTimeToMinutes(nextTodayClass.startTime);
+            const isLive = currentMinutes >= nextStart;
+            return {
+              featuredClass: nextTodayClass,
+              classBannerLabel: `Today • Next Lecture (${nextTodayClass.startTime})`,
+              countdownBadgeInfo: {
+                text: isLive ? 'Live Now' : `Scheduled at ${nextTodayClass.startTime}`,
+                type: isLive ? ('live' as const) : ('upcoming' as const),
+              },
+              isViewingYesterday: false,
+            };
+          }
+        }
       }
-      const target = new Date(`${nextClass.date} ${nextClass.startTime}`);
-      const remaining = target.getTime() - Date.now();
-      if (remaining <= 0) {
-        setTimeUntilNextClass('Starting now');
-        return;
+
+      // If today has no lectures or all today's lectures ended -> show next upcoming day's lecture banner
+      const futureClasses = filteredClassSessions
+        .filter(s => s.date > todayStr)
+        .sort((a, b) => a.date.localeCompare(b.date) || (parseTimeToMinutes(a.startTime) - parseTimeToMinutes(b.startTime)));
+
+      if (futureClasses.length > 0) {
+        const nextDayClass = futureClasses[0];
+        const isNextDayTomorrow = nextDayClass.date === tomorrowStr;
+        return {
+          featuredClass: nextDayClass,
+          classBannerLabel: isNextDayTomorrow ? `Tomorrow's Lecture (${nextDayClass.date})` : `Next Day Lecture (${nextDayClass.date})`,
+          countdownBadgeInfo: {
+            text: isNextDayTomorrow ? 'Tomorrow' : nextDayClass.date,
+            type: 'nextday' as const,
+          },
+          isViewingYesterday: false,
+        };
       }
-      const totalMinutes = Math.ceil(remaining / 60000);
-      const days = Math.floor(totalMinutes / 1440);
-      const hours = Math.floor((totalMinutes % 1440) / 60);
-      const minutes = totalMinutes % 60;
-      setTimeUntilNextClass(days > 0 ? `${days}d ${hours}h left` : hours > 0 ? `${hours}h ${minutes}m left` : `${minutes}m left`);
+    }
+
+    // 2. If viewing a date other than today
+    if (dayClassesSorted.length > 0) {
+      const cls = dayClassesSorted[0];
+      return {
+        featuredClass: cls,
+        classBannerLabel: isYesterday ? 'Yesterday Session' : `${selectedDate} Session`,
+        countdownBadgeInfo: {
+          text: cls.startTime,
+          type: isYesterday ? ('yesterday' as const) : ('upcoming' as const),
+        },
+        isViewingYesterday: isYesterday,
+      };
+    }
+
+    // Fallback if selected date has no classes -> show next upcoming class
+    const nextAvailable = filteredClassSessions
+      .filter(s => s.date >= selectedDate)
+      .sort((a, b) => a.date.localeCompare(b.date) || (parseTimeToMinutes(a.startTime) - parseTimeToMinutes(b.startTime)))[0]
+      || filteredClassSessions[0];
+
+    return {
+      featuredClass: nextAvailable || null,
+      classBannerLabel: nextAvailable?.date ? `Upcoming Session (${nextAvailable.date})` : 'Scheduled Lecture',
+      countdownBadgeInfo: {
+        text: nextAvailable ? `Next: ${nextAvailable.date}` : '',
+        type: 'nextday' as const,
+      },
+      isViewingYesterday: isYesterday,
     };
-    updateCountdown();
-    const timer = window.setInterval(updateCountdown, 30000);
-    return () => window.clearInterval(timer);
-  }, [nextClass?.id, nextClass?.date, nextClass?.startTime]);
+  }, [dayClassesSorted, filteredClassSessions, selectedDate, todayStr, yesterdayStr, tomorrowStr, nowMinuteTick]);
+
+  const nextClass = featuredClass;
 
   // Today stats based on selectedDate
   const todayClassesCount = filteredClassSessions.filter(s => s.date === selectedDate).length;
@@ -190,6 +303,24 @@ export const HomeDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Student Initiative Disclaimer Banner */}
+      <div className="p-3.5 sm:p-4 bg-slate-50 border border-slate-200/90 rounded-2xl flex items-center justify-between gap-3 text-xs text-slate-600">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="w-6 h-6 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xs shrink-0">
+            ⚠️
+          </span>
+          <p className="text-xs text-slate-600 leading-snug">
+            <strong className="text-slate-800 font-bold">Independent Student Portal:</strong> This website is an independent timetable organizer and is <span className="underline decoration-slate-400">not officially affiliated with or operated by IIT Patna</span>. For any missed classes or scheduling issues, the website owner is not responsible. Please verify with official institute channels.
+          </p>
+        </div>
+        <button
+          onClick={() => setCurrentView('about')}
+          className="shrink-0 text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1"
+        >
+          About & Contact
+        </button>
+      </div>
+
       {/* Elective Summary Banner (Dismissible) */}
       {!isAcademicTrackDismissed && (
         <div className="p-4 bg-linear-to-r from-indigo-500/10 via-blue-500/10 to-transparent border border-indigo-200/80 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative animate-in fade-in duration-200">
@@ -215,7 +346,10 @@ export const HomeDashboard: React.FC = () => {
               Change Electives
             </button>
             <button
-              onClick={() => setIsAcademicTrackDismissed(true)}
+              onClick={() => {
+                localStorage.setItem('academe_electives_saved', 'true');
+                setIsAcademicTrackDismissed(true);
+              }}
               className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-white/80 rounded-lg transition-colors"
               title="Close banner"
             >
@@ -232,13 +366,53 @@ export const HomeDashboard: React.FC = () => {
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-extrabold tracking-wider text-slate-400 uppercase">
-                Next Scheduled Lecture
+                {classBannerLabel}
               </span>
               <div className="flex items-center gap-2">
-                <span className="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border border-blue-100">
-                  {nextClass?.date === selectedDate ? 'Today Session' : nextClass?.date}
+                <span className={`px-3 py-1 text-xs font-bold rounded-full border ${
+                  isViewingYesterday
+                    ? 'bg-red-50 text-red-700 border-red-200'
+                    : nextClass?.date === selectedDate
+                    ? 'bg-blue-50 text-blue-700 border-blue-100'
+                    : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                }`}>
+                  {isViewingYesterday ? (
+                    <span className="text-red-600 font-extrabold">Yesterday</span>
+                  ) : nextClass?.date === todayStr ? (
+                    'Today'
+                  ) : nextClass?.date === tomorrowStr ? (
+                    'Tomorrow'
+                  ) : (
+                    nextClass?.date
+                  )}
                 </span>
-                {timeUntilNextClass && <span className="text-[11px] font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">Starts in {timeUntilNextClass}</span>}
+
+                {countdownBadgeInfo.type === 'countdown' && (
+                  <span className="text-[11px] font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100 animate-pulse">
+                    {countdownBadgeInfo.text}
+                  </span>
+                )}
+                {countdownBadgeInfo.type === 'live' && (
+                  <span className="text-[11px] font-extrabold text-rose-700 bg-rose-50 px-2.5 py-1 rounded-full border border-rose-200 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-rose-600 animate-ping" />
+                    Live Now
+                  </span>
+                )}
+                {countdownBadgeInfo.type === 'upcoming' && (
+                  <span className="text-[11px] font-extrabold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">
+                    {countdownBadgeInfo.text}
+                  </span>
+                )}
+                {countdownBadgeInfo.type === 'yesterday' && (
+                  <span className="text-[11px] font-extrabold text-red-600 bg-red-50 px-2.5 py-1 rounded-full border border-red-200">
+                    Yesterday's Lecture
+                  </span>
+                )}
+                {countdownBadgeInfo.type === 'nextday' && (
+                  <span className="text-[11px] font-extrabold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-200">
+                    Upcoming • {countdownBadgeInfo.text}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -329,7 +503,13 @@ export const HomeDashboard: React.FC = () => {
         <div className="lg:col-span-5 bg-white rounded-2xl p-6 border border-slate-100 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-extrabold tracking-wider text-slate-400 uppercase">
-              Schedule Overview ({selectedDate})
+              Schedule Overview ({selectedDate === yesterdayStr ? (
+                <span className="text-red-600 font-extrabold">Yesterday</span>
+              ) : selectedDate === todayStr ? (
+                'Today'
+              ) : (
+                selectedDate
+              )})
             </span>
             <button
               onClick={() => navigateDate('today')}
@@ -393,24 +573,6 @@ export const HomeDashboard: React.FC = () => {
                 {todayQuizzesCount}
               </span>
             </div>
-
-            {/* Recordings */}
-            <div 
-              onClick={() => setCurrentView('recordings')}
-              className="flex items-center justify-between cursor-pointer group p-1.5 rounded-xl hover:bg-slate-50 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <Video className="w-4 h-4" />
-                </div>
-                <span className="text-sm font-semibold text-slate-700 group-hover:text-emerald-600 transition-colors">
-                  OneDrive Recordings
-                </span>
-              </div>
-              <span className="text-base font-bold text-slate-900">
-                {todayRecordingsCount}
-              </span>
-            </div>
           </div>
 
           <div className="pt-2 text-center text-xs font-semibold text-slate-400">
@@ -427,8 +589,12 @@ export const HomeDashboard: React.FC = () => {
             <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">
               {monthNames[selMonth]} {selYear}
             </h2>
-            <span className="text-xs bg-slate-100 text-slate-600 font-bold px-2.5 py-0.5 rounded-full">
-              Selected: {selectedDate}
+            <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
+              selectedDate === yesterdayStr
+                ? 'bg-red-50 text-red-600 border-red-200'
+                : 'bg-slate-100 text-slate-600 border-slate-200'
+            }`}>
+              Selected: {selectedDate === yesterdayStr ? <strong className="text-red-600 uppercase font-extrabold">Yesterday ({selectedDate})</strong> : selectedDate}
             </span>
           </div>
 

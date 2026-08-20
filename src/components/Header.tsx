@@ -61,27 +61,18 @@ export const Header: React.FC = () => {
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <h1 className="text-lg sm:text-2xl font-extrabold text-slate-900 tracking-tight truncate">
-              Good morning, {profile.name.split(' ')[0]}.
+              Academic Hub & Timetable
             </h1>
-            <span className="text-base sm:text-xl shrink-0" role="img" aria-label="sun">☀️</span>
+            <span className="text-base sm:text-xl shrink-0" role="img" aria-label="university">🏛️</span>
           </div>
           <p className="text-xs sm:text-sm font-medium text-slate-500 mt-0.5 truncate">
-            {formattedDateStr} • {profile.program}
+            {formattedDateStr} • IIT Patna M.Tech Portal
           </p>
         </div>
       </div>
 
-      {/* Right Controls: verified account, daily brief, and notifications */}
+      {/* Right Controls: daily brief, and notifications */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        
-        <div 
-            onClick={() => setCurrentView('settings')}
-            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-emerald-50 border border-emerald-200/80 text-emerald-800 text-xs font-semibold cursor-pointer hover:bg-emerald-100/70 transition-colors"
-            title="Verified IITP account"
-          >
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-            <span className="truncate max-w-[150px] font-bold">{profile.email}</span>
-          </div>
 
         {/* Today's Brief Button on Mobile & Tablet (< xl screens) */}
         <button

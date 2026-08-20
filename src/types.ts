@@ -6,6 +6,7 @@ export type ViewMode =
   | 'quizzes' 
   | 'recordings' 
   | 'notifications' 
+  | 'about'
   | 'admin'
   | 'settings';
 

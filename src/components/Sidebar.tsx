@@ -7,12 +7,10 @@ import {
   CheckSquare, 
   Video, 
   Bell, 
-  Settings, 
   ShieldCheck, 
   GraduationCap,
   X,
-  Sparkles,
-  SlidersHorizontal
+  Info
 } from 'lucide-react';
 import { useAcademic } from '../context/AcademicContext';
 import { ViewMode } from '../types';
@@ -45,6 +43,7 @@ export const Sidebar: React.FC = () => {
     { id: 'quizzes', label: 'Quizzes', icon: CheckSquare },
     { id: 'recordings', label: 'Recordings', icon: Video },
     { id: 'notifications', label: 'Notifications', icon: Bell, badge: unreadCount },
+    { id: 'about', label: 'About', icon: Info },
   ];
 
   const handleNavClick = (view: ViewMode) => {
@@ -97,37 +96,6 @@ export const Sidebar: React.FC = () => {
             </button>
           </div>
 
-          {/* Only server-authorized administrators receive management navigation. */}
-          {canManage && <div className="mb-5">
-            <button
-              onClick={() => {
-                if (isAdminMode) {
-                  setIsAdminMode(false);
-                  setCurrentView('home');
-                } else {
-                  setIsAdminMode(true);
-                  setCurrentView('admin');
-                }
-                setIsMobileMenuOpen(false);
-              }}
-              className={`w-full py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all border ${
-                isAdminMode 
-                  ? 'bg-amber-50 text-amber-900 border-amber-300 shadow-xs' 
-                  : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/80'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <ShieldCheck className={`w-4 h-4 ${isAdminMode ? 'text-amber-600' : 'text-slate-500'}`} />
-                <span>{isAdminMode ? 'Admin Portal Active' : 'Faculty / Admin Mode'}</span>
-              </div>
-              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                isAdminMode ? 'bg-amber-200 text-amber-900' : 'bg-slate-200 text-slate-600'
-              }`}>
-                {isAdminMode ? 'ON' : 'SWITCH'}
-              </span>
-            </button>
-          </div>}
-
           {/* Main Navigation Menu */}
           <nav className="space-y-1">
             {navItems.map((item) => {
@@ -156,33 +124,13 @@ export const Sidebar: React.FC = () => {
                 </button>
               );
             })}
-
-            {/* Dedicated Admin view button */}
-            {canManage && <button
-              id="nav-item-admin"
-              onClick={() => {
-                setIsAdminMode(true);
-                setCurrentView('admin');
-                setIsMobileMenuOpen(false);
-              }}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors text-left ${
-                currentView === 'admin' && isAdminMode
-                  ? 'bg-amber-100/70 text-amber-900 font-semibold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <ShieldCheck className={`w-4 h-4 ${currentView === 'admin' ? 'text-amber-600' : 'text-slate-500'}`} />
-                <span>Admin Management</span>
-              </div>
-            </button>}
           </nav>
 
           {/* MY ENROLLED COURSES Section (Core + Chosen Electives) */}
           <div className="mt-8">
             <div className="flex items-center justify-between px-3.5 mb-2">
               <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">
-                My Enrolled Courses ({enrolledCourses.length})
+                Enrolled Courses ({enrolledCourses.length})
               </span>
               <button
                 onClick={() => setIsElectiveModalOpen(true)}
@@ -226,39 +174,28 @@ export const Sidebar: React.FC = () => {
           </div>
         </div>
 
-        {/* Bottom Profile Bar */}
-        <div className="p-4 border-t border-slate-100 bg-white">
-          <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors">
-            <img
-              src={profile.avatarUrl}
-              alt={profile.name}
-              className="w-10 h-10 rounded-full object-cover ring-2 ring-slate-100"
-            />
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-bold text-slate-900 truncate">
-                {profile.name}
-              </div>
-              <div className="text-xs text-slate-500 truncate">
-                {profile.studentId}
-              </div>
+        {/* Bottom Institutional Info & Admin Access */}
+        <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+          <div className="flex items-center justify-between px-2 py-1">
+            <div className="flex items-center gap-2 text-slate-500">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[11px] font-semibold">IIT Patna System Live</span>
             </div>
+            <a
+              href="#admin"
+              onClick={(e) => {
+                e.preventDefault();
+                window.location.hash = 'admin';
+                setCurrentView('admin');
+                setIsMobileMenuOpen(false);
+              }}
+              className="text-[11px] text-slate-400 hover:text-blue-600 font-bold transition-colors flex items-center gap-1"
+              title="Admin Portal"
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Admin</span>
+            </a>
           </div>
-
-          <button
-            id="btn-sidebar-settings"
-            onClick={() => handleNavClick('settings')}
-            className={`mt-2 w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-              currentView === 'settings' 
-                ? 'bg-slate-100 text-slate-900 font-semibold' 
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <Settings className="w-4 h-4 text-slate-400" />
-              <span>Settings</span>
-            </div>
-            <span className="text-slate-400 text-xs font-semibold">›</span>
-          </button>
         </div>
       </aside>
     </>

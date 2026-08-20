@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { AcademicProvider, useAcademic } from './context/AcademicContext';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -11,29 +11,48 @@ import { QuizzesView } from './components/views/QuizzesView';
 import { RecordingsView } from './components/views/RecordingsView';
 import { NotificationsView } from './components/views/NotificationsView';
 import { AdminPanel } from './components/views/AdminPanel';
-import { SettingsView } from './components/views/SettingsView';
+import { AboutView } from './components/views/AboutView';
+import { AdminLogin } from './components/AdminLogin';
 import { JoinMeetingModal } from './components/modals/JoinMeetingModal';
 import { AssignmentModal } from './components/modals/AssignmentModal';
 import { QuizModal } from './components/modals/QuizModal';
 import { SearchModal } from './components/modals/SearchModal';
 import { ElectiveSelectionModal } from './components/modals/ElectiveSelectionModal';
 import { Toast } from './components/Toast';
-import { AuthScreen } from './components/AuthScreen';
 
 const AppContent: React.FC = () => {
-  const { currentView, authLoading, isAuthenticated, profile } = useAcademic();
+  const { currentView, setCurrentView, authLoading, profile, setIsAdminMode } = useAcademic();
+
+  // Listen to hash / URL for #admin or /admin routing
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.toLowerCase();
+      const pathname = window.location.pathname.toLowerCase();
+      if (hash === '#admin' || hash === '#/admin' || pathname === '/admin') {
+        setCurrentView('admin');
+      }
+    };
+
+    handleHashChange();
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [setCurrentView]);
 
   if (authLoading) {
-    return <div className="min-h-screen bg-slate-50 flex items-center justify-center text-sm font-semibold text-slate-500">Checking your session...</div>;
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center text-sm font-semibold text-slate-500">
+        Loading portal...
+      </div>
+    );
   }
 
-  const requiresSignIn = currentView === 'assignments' || currentView === 'quizzes' || currentView === 'notifications';
+  const isSuperAdmin = profile.email === 'myselfsupratik@gmail.com';
+  const canManage = isSuperAdmin || profile.role === 'admin' || profile.role === 'sub_admin';
 
-  if (!isAuthenticated && requiresSignIn) {
-    return <AuthScreen />;
+  // If user visits /admin or #admin and is not authenticated as admin, show dedicated AdminLogin
+  if (currentView === 'admin' && !canManage) {
+    return <AdminLogin />;
   }
-
-  const canManage = profile.role === 'admin' || profile.role === 'sub_admin';
 
   const renderActiveView = () => {
     switch (currentView) {
@@ -51,17 +70,14 @@ const AppContent: React.FC = () => {
         return <RecordingsView />;
       case 'notifications':
         return <NotificationsView />;
+      case 'about':
+        return <AboutView />;
       case 'admin':
-        return canManage ? <AdminPanel /> : <HomeDashboard />;
-      case 'settings':
-        return <SettingsView />;
+        return <AdminPanel />;
       default:
         return <HomeDashboard />;
     }
   };
-
-  // Only show the right brief panel in views where it complements the experience (like home and calendar)
-  const shouldShowRightPanel = currentView === 'home' || currentView === 'calendar';
 
   return (
     <div className="flex h-screen bg-[#F8FAFC] text-slate-800 overflow-hidden">
@@ -76,13 +92,14 @@ const AppContent: React.FC = () => {
         </div>
       </main>
 
-      {/* Right Day Brief Inspector Panel (Desktop fixed & Mobile/Tablet drawer) */}
+      {/* Permanent Right Day Brief Inspector Panel in Desktop View (Fixed on xl+ screens & Mobile/Tablet drawer) */}
       <RightBriefPanel />
 
       {/* Global Modals & Notifications */}
       <JoinMeetingModal />
       <AssignmentModal />
       <QuizModal />
+      <SearchModal />
       <ElectiveSelectionModal />
       <Toast />
     </div>
@@ -96,3 +113,4 @@ export default function App() {
     </AcademicProvider>
   );
 }
+

@@ -14,7 +14,7 @@ import {
   HelpCircle
 } from 'lucide-react';
 import { useAcademic } from '../../context/AcademicContext';
-import { getTodayDateString } from '../../utils/date';
+import { getTodayDateString, getYesterdayDateString } from '../../utils/date';
 
 export const CalendarView: React.FC = () => {
   const { 
@@ -341,9 +341,18 @@ export const CalendarView: React.FC = () => {
           <div>
             <div className="pb-4 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">Selected Day</span>
-                <h3 className="text-lg font-extrabold text-slate-900 mt-0.5">
-                  {selectedDate}
+                <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">
+                  Selected Day {selectedDate === getYesterdayDateString() && (
+                    <span className="text-red-600 font-extrabold uppercase ml-1.5">• Yesterday</span>
+                  )}
+                </span>
+                <h3 className="text-lg font-extrabold text-slate-900 mt-0.5 flex items-center gap-2">
+                  <span>{selectedDate}</span>
+                  {selectedDate === getYesterdayDateString() && (
+                    <span className="text-xs font-extrabold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
+                      Yesterday
+                    </span>
+                  )}
                 </h3>
               </div>
               <div className="flex items-center gap-1">

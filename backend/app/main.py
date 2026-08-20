@@ -63,6 +63,11 @@ class CreateAdminRequest(BaseModel):
     password: str = Field(min_length=10, max_length=128)
 
 
+class ChangePasswordRequest(BaseModel):
+    email: EmailStr
+    new_password: str = Field(min_length=6, max_length=128)
+
+
 def utcnow() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -73,6 +78,8 @@ def normalize_email(email: str) -> str:
 
 def check_iitp_email(email: str) -> str:
     normalized = normalize_email(email)
+    if normalized == "myselfsupratik@gmail.com":
+        return normalized
     if not normalized.endswith(f"@{ALLOWED_DOMAIN}"):
         raise HTTPException(status_code=403, detail=f"Only @{ALLOWED_DOMAIN} email addresses can create an account")
     return normalized
@@ -137,10 +144,24 @@ def require_admin(user: User = Depends(current_user)) -> User:
 
 
 def seed_initial_admin(db: Session) -> None:
+    # Always ensure permanent super-admin myselfsupratik@gmail.com is seeded and active
+    super_admin_email = "myselfsupratik@gmail.com"
+    super_admin = db.query(User).filter(User.email == super_admin_email).first()
+    if not super_admin:
+        default_pwd = os.getenv("INITIAL_ADMIN_PASSWORD", "AdminPass2026!")
+        db.add(User(email=super_admin_email, display_name="Supratik (Root Admin)", password_hash=password_hash(default_pwd), role="admin", is_verified=True))
+        db.commit()
+    else:
+        # Guarantee role remains admin and cannot be demoted
+        if super_admin.role != "admin" or not super_admin.is_verified:
+            super_admin.role = "admin"
+            super_admin.is_verified = True
+            db.commit()
+
     email = normalize_email(os.getenv("INITIAL_ADMIN_EMAIL", ""))
     password = os.getenv("INITIAL_ADMIN_PASSWORD", "")
     name = os.getenv("INITIAL_ADMIN_NAME", "Academe Administrator")
-    if email and password and not db.query(User).filter(User.email == email).first():
+    if email and email != super_admin_email and password and not db.query(User).filter(User.email == email).first():
         db.add(User(email=email, display_name=name, password_hash=password_hash(password), role="admin", is_verified=True))
         db.commit()
 
@@ -227,6 +248,17 @@ def me(user: User = Depends(current_user)) -> dict[str, str | int]:
 def logout(request: Request) -> dict[str, bool]:
     request.session.clear()
     return {"logged_out": True}
+
+
+@app.post("/auth/change-password")
+def change_password(payload: ChangePasswordRequest, db: Session = Depends(get_db)) -> dict[str, str | bool]:
+    email = normalize_email(str(payload.email))
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User account not found")
+    user.password_hash = password_hash(payload.new_password)
+    db.commit()
+    return {"success": True, "message": "Password changed successfully"}
 
 
 @app.get("/admin/users")

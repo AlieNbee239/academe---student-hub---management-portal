@@ -19,6 +19,11 @@ export const ElectiveSelectionModal: React.FC = () => {
   const selectedCount = selectedElectiveIds.length;
   const maxAllowed = curriculumConfig.maxElectivesAllowed;
 
+  const handleSaveElectives = () => {
+    localStorage.setItem('academe_electives_saved', 'true');
+    setIsElectiveModalOpen(false);
+  };
+
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
       <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 overflow-hidden relative animate-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col">
@@ -140,7 +145,7 @@ export const ElectiveSelectionModal: React.FC = () => {
           </div>
 
           <button
-            onClick={() => setIsElectiveModalOpen(false)}
+            onClick={handleSaveElectives}
             className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs shadow-blue-500/20 transition-all"
           >
             Save & Update My Schedule
