@@ -30,6 +30,7 @@ import {
 import { useAcademic } from '../../context/AcademicContext';
 import { PlatformType, CourseType, ClassSession, Assignment, Quiz, Recording, Holiday } from '../../types';
 import { apiRequest } from '../../utils/api';
+import { TimePicker } from '../common/TimePicker';
 
 export const AdminPanel: React.FC = () => {
   const { 
@@ -617,26 +618,18 @@ export const AdminPanel: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Start Time</label>
-                    <input
-                      type="text"
-                      value={classStartTime}
-                      onChange={(e) => setClassStartTime(e.target.value)}
-                      placeholder="10:00 AM"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-medium"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">End Time</label>
-                    <input
-                      type="text"
-                      value={classEndTime}
-                      onChange={(e) => setClassEndTime(e.target.value)}
-                      placeholder="11:30 AM"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-medium"
-                    />
-                  </div>
+                  <TimePicker
+                    label="Start Time"
+                    value={classStartTime || '10:00 AM'}
+                    onChange={(val) => setClassStartTime(val)}
+                    required
+                  />
+                  <TimePicker
+                    label="End Time"
+                    value={classEndTime || '11:30 AM'}
+                    onChange={(val) => setClassEndTime(val)}
+                    required
+                  />
                 </div>
 
                 <div>
@@ -908,13 +901,10 @@ export const AdminPanel: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Due Time</label>
-                  <input
-                    type="text"
-                    value={assignDueTime}
-                    onChange={(e) => setAssignDueTime(e.target.value)}
-                    placeholder="11:59 PM"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-medium"
+                  <TimePicker
+                    label="Due Time"
+                    value={assignDueTime || '11:59 PM'}
+                    onChange={(val) => setAssignDueTime(val)}
                   />
                 </div>
               </div>
@@ -1671,24 +1661,18 @@ export const AdminPanel: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Start Time</label>
-                  <input
-                    type="text"
-                    value={editingClass.startTime}
-                    onChange={(e) => setEditingClass({ ...editingClass, startTime: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">End Time</label>
-                  <input
-                    type="text"
-                    value={editingClass.endTime}
-                    onChange={(e) => setEditingClass({ ...editingClass, endTime: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs"
-                  />
-                </div>
+                <TimePicker
+                  label="Start Time"
+                  value={editingClass.startTime || '10:00 AM'}
+                  onChange={(val) => setEditingClass({ ...editingClass, startTime: val })}
+                  required
+                />
+                <TimePicker
+                  label="End Time"
+                  value={editingClass.endTime || '11:30 AM'}
+                  onChange={(val) => setEditingClass({ ...editingClass, endTime: val })}
+                  required
+                />
               </div>
 
               <div>
@@ -1840,12 +1824,10 @@ export const AdminPanel: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Due Time</label>
-                  <input
-                    type="text"
-                    value={editingAssignment.dueTime}
-                    onChange={(e) => setEditingAssignment({ ...editingAssignment, dueTime: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs"
+                  <TimePicker
+                    label="Due Time"
+                    value={editingAssignment.dueTime || '11:59 PM'}
+                    onChange={(val) => setEditingAssignment({ ...editingAssignment, dueTime: val })}
                   />
                 </div>
               </div>
